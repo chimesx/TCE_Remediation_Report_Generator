@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地下水 TCE 場址整治決策專家系統 (v9 定量基因分析版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Microsoft JhengHei', 'Inter', sans-serif; background-color: #f8fafc; color: #334155; }
+        
+        .input-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+        .input-label { font-size: 0.8rem; font-weight: 700; color: #64748b; display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .input-field { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; transition: all 0.2s; }
+        .input-field:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); outline: none; }
+        .helper-text { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
+        
+        .report-section { margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px dashed #cbd5e1; }
+        .report-section:last-child { border-bottom: none; }
+        .report-title { font-size: 1.1rem; font-weight: 800; color: #0f172a; margin-bottom: 12px; display: flex; align-items: center; }
+        .report-title span { background: #0f172a; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; margin-right: 8px; }
+        
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        .data-table th { text-align: left; padding: 8px; background: #f1f5f9; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+        .data-table td { padding: 8px; border-bottom: 1px solid #f1f5f9; }
+        
+        .highlight-box { background: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 12px; margin-top: 8px; font-size: 0.95rem; color: #0c4a6e; }
+        .conclusion-box { background: #fffbeb; border: 1px solid #fcd34d; padding: 16px; border-radius: 8px; font-size: 0.95rem; line-height: 1.6; color: #451a03; margin-top: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 h-screen-lg">
+    
+    <!-- 左側控制面板 -->
+    <div class="lg:col-span-4 flex flex-col h-full overflow-y-auto pr-2 custom-scrollbar">
+        <header class="mb-6">
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight">TCE 整治決策系統</h1>
+            <p class="text-xs text-slate-500 font-bold uppercase tracking-wide mt-1">Version 9.0 qPCR Quantitative</p>
+        </header>
+
+        <form id="expertForm" onsubmit="generateReport(event)">
+            <!-- 1. 污染物 -->
+            <div class="input-card border-l-4 border-l-red-500">
+                <h3 class="font-bold text-slate-700 mb-3 text-sm">1. 污染物濃度 (mg/L)</h3>
+                <div class="space-y-3">
+                    <div><label class="input-label">TCE</label><input type="number" id="tce" step="0.001" class="input-field" value="0.001"></div>
+                    <div><label class="input-label">cis-1,2-DCE</label><input type="number" id="dce" step="0.001" class="input-field" value="0.001"></div>
+                    <div><label class="input-label">Vinyl Chloride (VC)</label><input type="number" id="vc" step="0.001" class="input-field" value="0.004"></div>
+                    <div><label class="input-label">Ethene (乙烯)</label><input type="number" id="ethene" step="0.001" class="input-field" value="0"></div>
+                </div>
+            </div>
+
+            <!-- 2. 地球化學 -->
+            <div class="input-card border-l-4 border-l-blue-500">
+                <h3 class="font-bold text-slate-700 mb-3 text-sm">2. 環境地球化學</h3>
+                <div class="space-y-3">
+                    <div><label class="input-label">ORP (mV)</label><input type="number" id="orp" step="1" class="input-field" value="211"></div>
+                    <div><label class="input-label">TOC 總有機碳 (mg/L)</label><input type="number" id="toc" step="0.1" class="input-field" value="77.4"></div>
+                    <div><label class="input-label">硫酸鹽 Sulfate (mg/L)</label><input type="number" id="sulfate" step="1" class="input-field" value="1"></div>
+                    <div><label class="input-label">pH 值</label><input type="number" id="ph" step="0.1" class="input-field" value="7.0"></div>
+                </div>
+            </div>
+
+            <!-- 3. 生物指標 (Quantitative qPCR) -->
+            <div class="input-card border-l-4 border-l-emerald-500">
+                <h3 class="font-bold text-slate-700 mb-1 text-sm">3. qPCR 精確微生物定量</h3>
+                <p class="text-xs text-slate-500 mb-3">支援科學記號 (例如 1.5e4 代表 15,000)</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="input-label">Dhc 菌群總數 (cells/mL)</label>
+                        <input type="number" id="dhc" step="any" class="input-field" placeholder="1e4" value="50000">
+                        <p class="helper-text">有效脫氯門檻：> 1.0 × 10⁴</p>
+                    </div>
+                    <div>
+                        <label class="input-label">tceA 基因拷貝數 (copies/mL)</label>
+                        <input type="number" id="tcea" step="any" class="input-field" placeholder="1e3" value="25000">
+                        <p class="helper-text">負責 TCE → DCE 反應</p>
+                    </div>
+                    <div>
+                        <label class="input-label">vcrA 基因拷貝數 (copies/mL)</label>
+                        <input type="number" id="vcra" step="any" class="input-field" placeholder="1e3" value="800">
+                        <p class="helper-text">負責 DCE/VC → Ethene 反應</p>
+                    </div>
+                    <div>
+                        <label class="input-label">etnC 基因拷貝數 (copies/mL)</label>
+                        <input type="number" id="etnc" step="any" class="input-field" placeholder="0" value="0">
+                        <p class="helper-text">好氧同化 VC/乙烯 潛力</p>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-all mt-2 mb-8">
+                生成 qPCR 精確評估報告
+            </button>
+        </form>
+    </div>
+
+    <!-- 右側報告輸出面板 -->
+    <div class="lg:col-span-8 bg-white border border-slate-200 rounded-xl shadow-sm p-8 h-full overflow-y-auto custom-scrollbar" id="reportArea">
+        
+        <div id="placeholder" class="h-full flex flex-col items-center justify-center text-slate-300">
+            <svg class="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            <p class="font-medium">請輸入左側數據以產生報告</p>
+        </div>
+
+        <div id="reportContent" class="hidden animate-fade-in">
+            
+            <!-- 一、污染物濃度鏈判讀 -->
+            <div class="report-section">
+                <div class="report-title"><span>1</span> 污染物濃度鏈判讀（關鍵！）</div>
+                <table class="data-table">
+                    <thead><tr><th>物質</th><th>濃度 (mg/L)</th><th>解讀</th></tr></thead>
+                    <tbody id="pollutantTable"></tbody>
+                </table>
+                <div class="highlight-box" id="pollutantSummary"></div>
+                <div class="mt-2 text-sm text-slate-600 bg-slate-50 p-2 rounded font-mono text-center" id="pollutantChainVisual"></div>
+            </div>
+
+            <!-- 二、環境地球化學條件判讀 -->
+            <div class="report-section">
+                <div class="report-title"><span>2</span> 環境地球化學條件判讀</div>
+                <div id="geochemList" class="space-y-4"></div>
+            </div>
+
+            <!-- 三、分子生物指標 (qPCR 定量分析) -->
+            <div class="report-section">
+                <div class="report-title"><span>3</span> qPCR 分子生物指標精確判讀</div>
+                <div class="bg-slate-50 p-3 rounded text-xs text-slate-500 mb-3 border border-slate-200">
+                    <strong>判定基準 (基於 ESTCP 準則)：</strong><br>
+                    ≥ 10⁴：高潛力主戰力 (綠) | 10³ ~ 10⁴：邊緣潛力，需刺激 (黃) | < 10³：無效濃度，需補菌 (紅)
+                </div>
+                <table class="data-table">
+                    <thead><tr><th>指標</th><th>定量濃度</th><th>門檻判定</th><th>實務意義</th></tr></thead>
+                    <tbody id="bioTable"></tbody>
+                </table>
+                <div class="highlight-box" id="bioSummary"></div>
+            </div>
+
+            <!-- 四、綜合機制判斷 -->
+            <div class="report-section">
+                <div class="report-title"><span>4</span> 綜合機制判斷（技術邏輯）</div>
+                <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                    <p class="mb-2 font-bold text-slate-700">目前場址狀態是：</p>
+                    <ul class="space-y-2 mb-4" id="mechanismChecklist"></ul>
+                    <div class="text-red-600 font-bold border-t border-slate-200 pt-2" id="limitingFactor"></div>
+                </div>
+            </div>
+
+            <!-- 五、標準結論句 -->
+            <div class="report-section">
+                <div class="report-title"><span>5</span> 報告可用的「標準結論句」</div>
+                <div class="mb-4">
+                    <h4 class="text-xs font-bold text-slate-400 uppercase mb-1">技術判讀版本 (供現況分析章節)</h4>
+                    <div class="conclusion-box" id="conclusionTechnical"></div>
+                </div>
+                <div>
+                    <h4 class="text-xs font-bold text-slate-400 uppercase mb-1">改善導向版本 (供建議方案章節)</h4>
+                    <div class="conclusion-box bg-emerald-50 border-emerald-200 text-emerald-900" id="conclusionAction"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    // 輔助函數：將數字轉換為漂亮的科學記號 HTML
+    function formatSci(num) {
+        if (!num || num === 0) return "未檢出";
+        if (num < 100) return num.toString();
+        let exp = num.toExponential(2);
+        let parts = exp.split('e');
+        let base = parts[0];
+        let power = parseInt(parts[1], 10);
+        return `${base} &times; 10<sup>${power}</sup>`;
+    }
+
+    // 輔助函數：判定濃度層級
+    function getBioLevel(num) {
+        if (num >= 1e4) return { class: 'text-emerald-600 font-bold', text: '高濃度 (≥10⁴)', flag: 'high' };
+        if (num >= 1e3) return { class: 'text-amber-600 font-bold', text: '邊緣潛力 (10³~10⁴)', flag: 'moderate' };
+        if (num > 0) return { class: 'text-red-600 font-bold', text: '無效濃度 (<10³)', flag: 'low' };
+        return { class: 'text-slate-400', text: '未檢出', flag: 'absent' };
+    }
+
+    function generateReport(e) {
+        e.preventDefault();
+
+        // 1. 獲取數據
+        const tce = parseFloat(document.getElementById('tce').value) || 0;
+        const dce = parseFloat(document.getElementById('dce').value) || 0;
+        const vc = parseFloat(document.getElementById('vc').value) || 0;
+        const ethene = parseFloat(document.getElementById('ethene').value) || 0;
+        
+        const orp = parseFloat(document.getElementById('orp').value) || 0;
+        const toc = parseFloat(document.getElementById('toc').value) || 0;
+        const sulfate = parseFloat(document.getElementById('sulfate').value) || 0;
+        const ph = parseFloat(document.getElementById('ph').value) || 7.0;
+        
+        // 取得定量數據
+        const dhc = parseFloat(document.getElementById('dhc').value) || 0;
+        const tcea = parseFloat(document.getElementById('tcea').value) || 0;
+        const vcra = parseFloat(document.getElementById('vcra').value) || 0;
+        const etnc = parseFloat(document.getElementById('etnc').value) || 0;
+
+        // ----------------------------------------------------
+        // Logic 1: 污染物鏈判讀 (維持原邏輯)
+        // ----------------------------------------------------
+        let pTableHtml = "";
+        let isVcStall = false;
+        let pSummary = "";
+        let pChain = "";
+        let stallType = "";
+
+        let tceStatus = tce < 0.01 ? "幾乎被降解" : "仍有殘留";
+        pTableHtml += `<tr><td>TCE</td><td>${tce}</td><td class="${tce < 0.01 ? 'text-emerald-600 font-bold' : ''}">${tceStatus}</td></tr>`;
+        
+        let dceStatus = (dce > tce && dce > 0.1) ? "累積中 (主要產物)" : (dce < 0.01 ? "低濃度" : "已進入後段");
+        pTableHtml += `<tr><td>cis-1,2-DCE</td><td>${dce}</td><td>${dceStatus}</td></tr>`;
+
+        let vcStatus = "";
+        if (vc > 0.01 && ethene < 0.01) {
+            vcStatus = "⚠ 明顯累積 (關鍵風險)";
+            isVcStall = true;
+        } else if (vc < 0.01) {
+            vcStatus = "低濃度";
+        } else {
+            vcStatus = "轉化中";
+        }
+        pTableHtml += `<tr><td>VC</td><td>${vc}</td><td class="${isVcStall ? 'text-red-600 font-bold' : ''}">${vcStatus}</td></tr>`;
+
+        let ethStatus = ethene < 0.001 ? "❌ 未檢出 (最後一步未發生)" : "✅ 已生成 (復育成功)";
+        pTableHtml += `<tr><td>Ethene</td><td>${ethene}</td><td class="${ethene < 0.001 ? 'text-red-600 font-bold' : 'text-emerald-600 font-bold'}">${ethStatus}</td></tr>`;
+
+        if (isVcStall) {
+            pSummary = "👉 這是典型「VC stall（卡關）」型態";
+            pChain = "TCE → DCE → <span class='text-red-600 font-bold'>VC(卡住)</span> ↛ Ethene";
+            stallType = "VC_STALL";
+        } else if (dce > tce * 5 && vc < 0.1) {
+            pSummary = "👉 這是典型「DCE stall（卡關）」型態";
+            pChain = "TCE → <span class='text-amber-600 font-bold'>DCE(卡住)</span> → VC";
+            stallType = "DCE_STALL";
+        } else if (ethene > vc && vc < 0.05) {
+            pSummary = "👉 這是「完全脫氯（Complete Dechlorination）」型態";
+            pChain = "TCE → DCE → VC → <span class='text-emerald-600 font-bold'>Ethene(完成)</span>";
+            stallType = "COMPLETE";
+        } else {
+            pSummary = "👉 處於降解反應初期或混合型態";
+            pChain = "反應路徑進行中";
+            stallType = "MIXED";
+        }
+
+        document.getElementById('pollutantTable').innerHTML = pTableHtml;
+        document.getElementById('pollutantSummary').innerText = pSummary;
+        document.getElementById('pollutantChainVisual').innerHTML = pChain;
+
+        // ----------------------------------------------------
+        // Logic 2: 地球化學判讀
+        // ----------------------------------------------------
+        let geoHtml = "";
+        let limitingFactor = "";
+        
+        if (orp > 50) {
+            geoHtml += `<div class="flex items-start"><div class="bg-slate-200 text-slate-700 font-bold rounded px-2 mr-3 whitespace-nowrap">1️⃣ ORP = ${orp} mV</div><div><div class="font-bold text-red-600">（致命關鍵） 明確為 氧化環境</div><div class="text-sm text-slate-600">不符合 VC → Ethene 所需厭氧條件（理想值 < -50 mV）</div><div class="text-sm font-bold text-sky-700 mt-1">👉 這一項直接解釋為什麼厭氧脫氯受阻</div></div></div>`;
+            limitingFactor = "ORP 過高（氧化環境）";
+        } else {
+            geoHtml += `<div class="flex items-start"><div class="bg-slate-200 text-slate-700 font-bold rounded px-2 mr-3 whitespace-nowrap">1️⃣ ORP = ${orp} mV</div><div><div class="font-bold text-emerald-600">合適的還原環境</div><div class="text-sm text-slate-600">有利於厭氧生物脫氯。</div></div></div>`;
+        }
+
+        if (toc > 20) {
+            geoHtml += `<div class="flex items-start mt-4"><div class="bg-slate-200 text-slate-700 font-bold rounded px-2 mr-3 whitespace-nowrap">2️⃣ TOC = ${toc} mg/L</div><div><div class="font-bold text-emerald-600">（非常高） 電子供體完全不缺</div><div class="text-sm text-slate-600">排除「碳源不足」問題。</div>${orp > 50 ? '<div class="text-sm font-bold text-sky-700 mt-1">👉 碳源夠但 ORP 高，高度懷疑有外部含氧水體持續補注</div>' : ''}</div></div>`;
+        } else {
+            geoHtml += `<div class="flex items-start mt-4"><div class="bg-slate-200 text-slate-700 font-bold rounded px-2 mr-3 whitespace-nowrap">2️⃣ TOC = ${toc} mg/L</div><div><div class="font-bold text-red-600">基質不足</div><div class="text-sm text-slate-600">缺乏電子予體驅動反應。</div></div></div>`;
+            if (limitingFactor === "") limitingFactor = "碳源(TOC)不足";
+        }
+
+        if (sulfate < 50) {
+            geoHtml += `<div class="flex items-start mt-4"><div class="bg-slate-200 text-slate-700 font-bold rounded px-2 mr-3 whitespace-nowrap">3️⃣ 硫酸鹽 = ${sulfate} mg/L</div><div><div class="font-bold text-emerald-600">（很低） 硫酸鹽已被消耗或背景值低</div><div class="text-sm text-slate-600">無競爭抑制，理論上可進入脫氯區段。</div></div></div>`;
+        } else if (sulfate > 400) {
+            geoHtml += `<div class="flex items-start mt-4"><div class="bg-slate-200 text-slate-700 font-bold rounded px-2 mr-3 whitespace-nowrap">3️⃣ 硫酸鹽 = ${sulfate} mg/L</div><div><div class="font-bold text-red-600">濃度過高</div><div class="text-sm text-slate-600">存在強烈 SRB 競爭反應，抑制脫氯菌生長。</div></div></div>`;
+            if (limitingFactor === "") limitingFactor = "高硫酸鹽競爭抑制";
+        }
+
+        document.getElementById('geochemList').innerHTML = geoHtml;
+
+
+        // ----------------------------------------------------
+        // Logic 3: 分子生物指標 (qPCR 定量分析)
+        // ----------------------------------------------------
+        let bioHtml = "";
+        let bioSummary = "";
+        
+        let dhcStatus = getBioLevel(dhc);
+        let tceaStatus = getBioLevel(tcea);
+        let vcraStatus = getBioLevel(vcra);
+        let etncStatus = getBioLevel(etnc);
+
+        // 單位顯示設定
+        const unit = `<span class="text-xs text-slate-400 ml-1">cells/mL</span>`;
+        const unitCp = `<span class="text-xs text-slate-400 ml-1">copies/mL</span>`;
+
+        bioHtml += `<tr><td class="font-bold">Dhc 總數</td><td class="font-mono">${formatSci(dhc)} ${unit}</td><td class="${dhcStatus.class}">${dhcStatus.text}</td><td>${dhcStatus.flag === 'high' ? '關鍵脫氯菌群數量充足' : '基礎脫氯部隊不足'}</td></tr>`;
+        bioHtml += `<tr><td class="font-bold">tceA (前段)</td><td class="font-mono">${formatSci(tcea)} ${unitCp}</td><td class="${tceaStatus.class}">${tceaStatus.text}</td><td>${tceaStatus.flag === 'high' ? '具備強勢 TCE → DCE 轉化潛能' : '初始脫氯引擎薄弱'}</td></tr>`;
+        bioHtml += `<tr><td class="font-bold">vcrA (後段)</td><td class="font-mono">${formatSci(vcra)} ${unitCp}</td><td class="${vcraStatus.class}">${vcraStatus.text}</td><td>${vcraStatus.flag === 'high' ? '具備終極解毒 (VC → 乙烯) 潛能' : '缺乏終極解毒基因，必卡關'}</td></tr>`;
+        bioHtml += `<tr><td class="font-bold">etnC (好氧)</td><td class="font-mono">${formatSci(etnc)} ${unitCp}</td><td class="${etncStatus.class}">${etncStatus.text}</td><td>${etncStatus.flag === 'high' || etncStatus.flag === 'moderate' ? '邊界具好氧同化 VC 潛力' : '無好氧衰減優勢'}</td></tr>`;
+
+        // qPCR 深度解析總結
+        if (dhcStatus.flag === 'high' && vcraStatus.flag === 'high') {
+            bioSummary = `👉 <strong>深度解析（加分項）：</strong><br>
+                檢測結果顯示 <i>Dehalococcoides</i> 與 <i>vcrA</i> 均突破 10⁴ 的有效門檻。這代表場址絕對具備將污染物徹底無毒化的生物引擎。問題不在「菌」，而純粹是當前的「化學環境 (ORP=${orp})」踩了煞車。`;
+        } else if (dhcStatus.flag === 'high' && vcraStatus.flag === 'low') {
+            bioSummary = `👉 <strong>深度解析（卡關主因）：</strong><br>
+                雖然 Dhc 總數高達 ${formatSci(dhc)}，但負責最後一步的 <i>vcrA</i> 基因濃度卻僅有 ${formatSci(vcra)} (< 10³)。<br>
+                這解釋了為何會發生 VC 累積：**雖然有菌，但這批菌不會吃 VC**。必須透過生物增益 (補充特定 vcrA 菌株) 來補足基因缺口。`;
+            if (limitingFactor === "") limitingFactor = "vcrA 功能基因濃度過低 (<10³)";
+        } else if (dhcStatus.flag === 'moderate') {
+            bioSummary = `👉 <strong>深度解析：</strong><br>
+                Dhc 濃度落在 10³ ~ 10⁴ 之間，屬於「潛力邊緣」。尚未達到快速脫氯的黃金門檻 (10⁴)，建議透過基質添加 (Biostimulation) 先行刺激培養，觀察數量是否能拉升。`;
+            if (limitingFactor === "") limitingFactor = "生物族群尚未達到有效規模";
+        } else {
+            bioSummary = `👉 <strong>深度解析：</strong><br>
+                核心脫氯菌與基因濃度均低於有效門檻 (< 10³)，場址缺乏先天生物降解能力。這屬於「無引擎」狀態，若要啟動生物復育，**生物增益 (Bioaugmentation)** 是必備選項。`;
+            if (limitingFactor === "") limitingFactor = "缺乏有效濃度的核心脫氯菌群 (<10³)";
+        }
+
+        if (etncStatus.flag === 'high' || etncStatus.flag === 'moderate') {
+            bioSummary += `<br><br><span class="text-sky-700">💡 <strong>MNA 亮點 (etnC)：</strong></span><br>
+            好氧 <i>etnC</i> 基因濃度達 ${formatSci(etnc)}，這為「污染團邊界好氧自然衰減 (Aerobic MNA)」提供了強力的分子生物學數據支撐。`;
+        }
+
+        document.getElementById('bioTable').innerHTML = bioHtml;
+        document.getElementById('bioSummary').innerHTML = bioSummary;
+
+
+        // ----------------------------------------------------
+        // Logic 4: 綜合機制 Checklist
+        // ----------------------------------------------------
+        let checkHtml = "";
+        
+        checkHtml += dhcStatus.flag === 'high' ? '<li class="text-emerald-700">✅ 菌相規模達標 (>10⁴ cells/mL)</li>' : '<li class="text-red-700">❌ 菌相規模不足 (未達 10⁴ 門檻)</li>';
+        checkHtml += tceaStatus.flag === 'high' ? '<li class="text-emerald-700">✅ 具備強勢 TCE 還原基因 (tceA >10⁴)</li>' : '<li class="text-amber-600">⚠ TCE 還原基因數量偏低</li>';
+        checkHtml += vcraStatus.flag === 'high' ? '<li class="text-emerald-700">✅ 具備 VC 厭氧降解基因 (vcrA >10⁴)</li>' : '<li class="text-red-700">❌ 終極解毒基因數量過低 (<10³)</li>';
+        checkHtml += toc > 20 ? '<li class="text-emerald-700">✅ 電子予體充足 (TOC >20 mg/L)</li>' : '<li class="text-red-700">❌ 電子予體匱乏 (需補碳源)</li>';
+        
+        if (orp > 50) checkHtml += `<li class="text-red-700">❌ ORP 過高（屬氧化環境，直接煞車）</li>`;
+        else checkHtml += `<li class="text-emerald-700">✅ ORP 條件吻合（還原環境）</li>`;
+
+        document.getElementById('mechanismChecklist').innerHTML = checkHtml;
+        
+        if (limitingFactor === "") limitingFactor = "無明顯限制因子，建議持續監測";
+        document.getElementById('limitingFactor').innerText = `👉 核心限制因子 = ${limitingFactor}`;
+
+
+        // ----------------------------------------------------
+        // Logic 5: 標準結論句生成
+        // ----------------------------------------------------
+        let techSentence = `監測結果顯示，地下水中 TCE 濃度已顯著降低，`;
+        if (isVcStall) techSentence += `惟氯乙烯 (VC) 仍有顯著累積情形，且未檢出乙烯生成。`;
+        else techSentence += `各項污染物濃度呈現穩定衰減趨勢。`;
+
+        // qPCR 敘述
+        if (dhcStatus.flag === 'high' && vcraStatus.flag === 'high') {
+            techSentence += `經 qPCR 分子生物檢測，<i>Dehalococcoides</i> spp. 總數達 ${formatSci(dhc)} cells/mL，且關鍵功能基因 <i>vcrA</i> 達 ${formatSci(vcra)} copies/mL，均遠高於 10⁴ 之有效脫氯門檻，證實場址具備極佳之完全厭氧脫氯生物引擎。`;
+        } else if (dhcStatus.flag === 'high' && vcraStatus.flag === 'low') {
+            techSentence += `qPCR 檢測顯示 <i>Dehalococcoides</i> spp. 雖高達 ${formatSci(dhc)} cells/mL，惟負責將 VC 轉化為乙烯之 <i>vcrA</i> 基因濃度僅 ${formatSci(vcra)} copies/mL (< 10³ 無效門檻)，此生物群落基因型之缺陷，為目前發生 DCE/VC 停滯之主因。`;
+        } else {
+             techSentence += `qPCR 檢測顯示核心脫氯菌與基因濃度均低於 10³ 之有效門檻，場址先天厭氧生物降解潛力受限。`;
+        }
+
+        if (etncStatus.flag === 'high' || etncStatus.flag === 'moderate') {
+            techSentence += `此外，好氧同化基因 <i>etnC</i> 濃度達 ${formatSci(etnc)} copies/mL，顯示污染團好氧邊界處具備直接削弱 VC 之潛力。`;
+        }
+
+        if (orp > 50) {
+            techSentence += `然檢視環境因子，目前 ORP 為 ${orp} mV，屬氧化環境，此乃當前限制厭氧生物活化之首要物理化學障礙。`;
+        } else if (toc < 20) {
+            techSentence += `然目前 TOC 偏低，電子予體供應枯竭為限制厭氧脫氯反應維持之主因。`;
+        }
+        
+        document.getElementById('conclusionTechnical').innerHTML = techSentence;
+
+        // 改善建議句
+        let actionSentence = "建議後續改善策略應以";
+        if (orp > 50 && vcraStatus.flag === 'high') {
+            actionSentence += "「降低地下水氧化還原電位」為優先。鑑於場址原生菌群與 <i>vcrA</i> 基因數量皆已達標 (>10⁴)，具備強大之生物解毒引擎，僅需透過工程手段營造強還原性環境（如添加適當碳源消耗溶氧），即可解除氧化抑制，重新啟動氯乙烯之最終礦化機制。";
+        } else if (vcraStatus.flag === 'low') {
+            actionSentence += "「生物增益 (Bioaugmentation)」為核心。因場址缺乏有效濃度之 <i>vcrA</i> 基因 (<10³)，建議於環境條件整備完成後，注入富含 <i>vcrA</i> 之商業菌液以突破 VC 降解瓶頸。";
+        } else if (toc < 20) {
+            actionSentence += "「基質補充 (Biostimulation)」為優先，建議追加注入乳化植物油等電子予體，以推動生物完全脫氯反應。";
+        } else {
+            actionSentence += "「監測式自然衰減 (MNA)」為主，定期以 qPCR 追蹤各項 MBTs 指標之維持狀態。";
+        }
+
+        if (etncStatus.flag === 'high') {
+            actionSentence += " 同時，後續 MNA 評估可納入邊界好氧區之 <i>etnC</i> 降解途徑作為擴散控制之依據。";
+        }
+
+        document.getElementById('conclusionAction').innerHTML = actionSentence;
+
+        // Show Result
+        document.getElementById('placeholder').classList.add('hidden');
+        document.getElementById('reportContent').classList.remove('hidden');
+    }
+</script>
+
+</body>
+</html>
